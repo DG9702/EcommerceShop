@@ -51,7 +51,7 @@ const SidebarBarWrapper = () => {
           </Link>
         </Box>
       </Sidebar.Header>
-      <div className="block my-3 h-full">
+      <div className="block my-2 h-full">
         <Sidebar.Body className="body sidebar">
           <SidebarItem
             title="Dashboard"
@@ -59,7 +59,7 @@ const SidebarBarWrapper = () => {
             isActive={activeSidebar==="/dashboard"}
             href="/dashboard"
           />
-          <div className="mt-2 block">
+          <div className="mt-1 block">
             <SidebarMenu  title="Main Menu">
               <SidebarItem
                 title="Orders"

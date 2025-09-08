@@ -7,7 +7,7 @@ const SizeSelector = ({ control, errors }: any) => {
     <>
       <label className="block font-semibold text-gray-300 mb-1">Sizes</label>
       <Controller
-        name="Sizes"
+        name="sizes"
         control={control}
         render={({ field }) => (
           <div className="flex gap-2 flex-wrap">

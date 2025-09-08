@@ -1,8 +1,11 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import ImagePLaceHolder from "apps/seller-ui/src/shared/components/image-placeholder";
+import {enhancements} from "apps/seller-ui/src/utils/ai.enhancements";
 import axiosInstance from "apps/seller-ui/src/utils/axiosInstance";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Wand, X } from "lucide-react";
+import Image from "next/image";
+import {useRouter} from "next/navigation";
 import ColorSelector from "packages/components/color-selector";
 import CustomProperties from "packages/components/Custom-properties";
 import CustomSpecifications from "packages/components/custom-specifications";
@@ -11,6 +14,12 @@ import RichTextEditor from "packages/components/rich-text-editor";
 import SizeSelector from "packages/size-selector";
 import React, { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import toast from "react-hot-toast";
+
+interface uploadedImage {
+  fileId: string;
+  file_url: string;
+}
 
 const Page = () => {
   const {
@@ -22,10 +31,15 @@ const Page = () => {
     formState: { errors },
   } = useForm();
 
-  const [openImageModal, setOpenImageModal] = useState(false);
+  const [openImageModal, setOpenImageModal]=useState(false);
+  const [selectedImage, setSelectedImage]=useState('');
+  const [activeEffect, setActiveEffect] = useState<string | null>(null)
+  const [pictureUploadingLoader, setPictureUploadingLoader]=useState(false);
   const [isChanged, setIsChanged] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [images, setImages] = useState<(File | null)[]>([null]);
+  const [images, setImages]=useState<(uploadedImage|null)[]>([null]);
+  const [processing, setProcessing]=useState(false);
+  const router=useRouter();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["categories"],
@@ -41,6 +55,14 @@ const Page = () => {
     retry: 2,
   });
 
+  const { data: discountCodes = [], isLoading: discountLoading } = useQuery({
+    queryKey: ["shop-discounts"],
+    queryFn: async () => {
+      const res = await axiosInstance.get("/product/api/get-discount-codes");
+      return res?.data?.discount_codes || [];
+    },
+  });
+
   const categories = data?.categories || [];
   const subCategoriesData = data?.subCategories || {};
 
@@ -51,44 +73,106 @@ const Page = () => {
     return selectedCategory ? subCategoriesData[selectedCategory] || [] : [];
   }, [selectedCategory, subCategoriesData]);
 
-  const onSubmit = (data: any) => {
-    console.log(data);
-  };
 
-  const handleImageChange = (file: File | null, index: number) => {
-    const updatedImages = [...images];
+  const onSubmit=async (data: any) => {
 
-    updatedImages[index] = file;
-
-    if (index === images.length - 1 && images.length < 8) {
-      updatedImages.push(null);
+    try {
+      setLoading(true);
+      await axiosInstance.post("/product/api/create-product", data);
+      router.push("/dashboard/all-products");
+    } catch (error: any) {
+      toast.error("Error on Submit", error?.data?.message);
+    } finally {
+      setLoading(false);
     }
-
-    setImages(updatedImages);
-    setValue("images", updatedImages);
   };
 
-  const handleRemoveImage = (index: number) => {
-    setImages((prevImages) => {
-      let updatedImages = [...prevImages];
+  const convertFileToBase64=(file: File) => {
+    return new Promise((resolve, reject) => {
+      const reader=new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload=() => resolve(reader.result);
+      reader.onerror=(error) => reject(error);
+    })
+  }
 
-      if (index === -1) {
-        updatedImages[0] = null;
-      } else {
-        updatedImages.splice(index, 1);
+  const handleImageChange = async (file: File | null, index: number) => {
+    if(!file) return;
+    setPictureUploadingLoader(true)
+    try {
+      const fileName=await convertFileToBase64(file);
+
+      const response=await axiosInstance.post("/product/api/upload-product-image", {fileName});
+
+      const uploadedImage: uploadedImage ={
+        fileId: response.data.fileId,
+        file_url: response.data.file_url,
       }
 
-      if (!updatedImages.includes(null) && updatedImages.length < 8) {
+      const updateImages=[...images];
+
+      updateImages[index]=uploadedImage;
+
+      if(index===images.length-1&&updateImages.length<8) {
+        updateImages.push(null)
+      }
+
+      setImages(updateImages);
+      setValue("images", updateImages)
+
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setPictureUploadingLoader(false)
+    }
+  };
+
+  const handleRemoveImage = async (index: number) => {
+    try {
+      const updatedImages=[...images];
+
+      const imageToDelete=updatedImages[index];
+
+      if(imageToDelete&&typeof imageToDelete==="object") {
+        await axiosInstance.delete("/product/api/delete-product-image", {
+          data: {
+            fieldId: imageToDelete.fileId!,
+          }
+         })
+      }
+
+      updatedImages.splice(index, 1);
+
+      if(!updatedImages.includes(null)&&updatedImages.length<8) {
         updatedImages.push(null);
       }
 
-      return updatedImages;
-    });
+      setImages(updatedImages);
+      setValue("images", updatedImages)
+    } catch (error) {
+      console.log(error);
 
-    setValue("images", images);
+    }
   };
 
-  const handleSaveDraft = () => {};
+  const applyTransformation=async (transformation: string) => {
+    if(!selectedImage||processing) return;
+    setProcessing(true);
+    setActiveEffect(transformation);
+
+    try {
+      const transformedUrl=`${selectedImage}?tr=${transformation}`;
+      setSelectedImage(transformedUrl);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  const handleSaveDraft=() => {
+    setIsChanged(false)
+  };
 
   return (
     <form
@@ -113,8 +197,11 @@ const Page = () => {
               setOpenImageModal={setOpenImageModal}
               size="765 x 850"
               small={false}
+              images={images}
               index={0}
+              pictureUploadingLoader={pictureUploadingLoader}
               onImageChange={handleImageChange}
+              setSelectedImage={setSelectedImage}
               onRemove={handleRemoveImage}
             />
           )}
@@ -122,12 +209,15 @@ const Page = () => {
           <div className="grid grid-cols-2 gap-3 mt-4">
             {images.slice(1).map((_, index) => (
               <ImagePLaceHolder
+                small
                 setOpenImageModal={setOpenImageModal}
+                pictureUploadingLoader={pictureUploadingLoader}
                 size="765 x 850"
                 key={index}
-                small
+                images={images}
                 index={index + 1}
                 onImageChange={handleImageChange}
+                setSelectedImage={setSelectedImage}
                 onRemove={handleRemoveImage}
               />
             ))}
@@ -159,21 +249,21 @@ const Page = () => {
                   cols={10}
                   label="Short Description * (Max 150 words)"
                   placeholder="Enter product description for quick view"
-                  {...register("description", {
-                    required: "Description is required",
+                  {...register("short_description", {
+                    required: "Short description is required",
                     validate: (value) => {
                       const wordCount = value.trim().split(/\s+/).length;
                       return (
                         wordCount <= 150 ||
-                        `Description cannot exceed 150 words (Current: ${wordCount})`
+                        `Short description cannot exceed 150 words (Current: ${wordCount})`
                       );
                     },
                   })}
                 />
 
-                {errors.description && (
+                {errors.short_description && (
                   <p className="text-red-500 text-xs mt-1">
-                    {errors.description.message as string}
+                    {errors.short_description.message as string}
                   </p>
                 )}
               </div>
@@ -272,7 +362,7 @@ const Page = () => {
                     required: "Cash on delivery is required!",
                   })}
                   defaultValue="yes"
-                  className="w-full border outline-none border-gray-700 bg-transparent"
+                  className="border outline-none border-gray-700 bg-transparent p-2 rounded-md text-white w-full"
                 >
                   <option value="yes" className="bg-black">
                     Yes
@@ -300,13 +390,13 @@ const Page = () => {
                   <p>Failed to load categories</p>
                 ) : (
                   <Controller
-                    name="Category"
+                    name="category"
                     control={control}
                     rules={{ required: "Category is required" }}
                     render={({ field }) => (
                       <select
                         {...field}
-                        className="w-full border outline-none border-gray-700 bg-transparent"
+                        className="border outline-none border-gray-700 bg-transparent p-2 rounded-md text-white w-full"
                       >
                         <option value="" className="bg-black">
                           Select Category
@@ -337,13 +427,13 @@ const Page = () => {
                 </label>
 
                 <Controller
-                  name="Subcategory"
+                  name="subCategory"
                   control={control}
-                  rules={{ required: "SubCategory is required" }}
+                  rules={{ required: "subcategory is required" }}
                   render={({ field }) => (
                     <select
                       {...field}
-                      className="w-full border outline-none border-gray-700 bg-transparent"
+                      className="border outline-none border-gray-700 bg-transparent p-2 rounded-md text-white w-full"
                     >
                       <option value="" className="bg-black">
                         Select Subcategory
@@ -361,9 +451,9 @@ const Page = () => {
                   )}
                 />
 
-                {errors.subcategory && (
+                {errors.subCategory && (
                   <p className="text-red-500 text-xs mt-1">
-                    {errors.subcategory.message as string}
+                    {errors.subCategory.message as string}
                   </p>
                 )}
               </div>
@@ -443,7 +533,7 @@ const Page = () => {
                     valueAsNumber: true,
                     min: { value: 1, message: "Sale Price must be at least 1" },
                     validate: (value) => {
-                      !isNaN(value) || "Only numbers are allowed";
+                      if(isNaN(value)) return "Only numbers are allowed";
                       if (regularPrice && value >= regularPrice) {
                         return "Sale Price must be less than regular price";
                       }
@@ -492,12 +582,78 @@ const Page = () => {
                 <label className="blck font-semibold text-gray-300 mb-1">
                   Select Discount Codes (optional)
                 </label>
+
+                {discountLoading ? (
+                  <p className="text-gray-400">Loading discount codes ...</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {discountCodes?.map((code: any) => (
+                      <button
+                        key={code.id}
+                        type="button"
+                        className={`px-3 py-1 rounded-md text-sm font-semibold border ${
+                          watch("discountCodes")?.includes(code.id)
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700"
+                        }`}
+                        onClick={() => {
+                          const currentSelection = watch("discountCodes") || [];
+                          const updatedSelection = currentSelection?.includes(
+                            code.id
+                          )
+                            ? currentSelection.filter(
+                                (id: string) => id !== code.id
+                              )
+                            : [...currentSelection, code.id];
+                          setValue("discountCodes", updatedSelection);
+                        }}
+                      >
+                        {code?.public_name} ({code.discountValue}
+                        {code.discountType === "percentage" ? "%" : "$"})
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
-
+      {openImageModal&&(
+        <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-60 z-50">
+          <div className="bg-gray-800 p-6 rounded-lg w-[450px] text-white">
+            <div className="flex justify-between items-center pb-3 mb-4">
+              <h2 className="text-lg font-semibold">Enhance Product Image</h2>
+              <X
+                size={20}
+                className="cursor-pointer"
+                onClick={() => setOpenImageModal(!openImageModal)}
+              />
+            </div>
+            <div className="relative w-full h-[250px] rounded-md overflow-hidden border bg-gray-600">
+              <Image src={selectedImage} alt="product-image" layout="fill" />
+            </div>
+            {selectedImage&&(
+              <div className="mt-4 space-y-2">
+                <h3 className="text-white text-sm font-semibold">AI Enhancements</h3>
+                <div className="grid grid-cols-2 gap-3 mx-h-[250px] overflow-y-auto">
+                  {enhancements?.map(({label, effect}) => (
+                    <button
+                      key={effect}
+                      className={`p-2 rounded-md flex items-center gap-2 ${activeEffect===effect? "bg-blue-600 text-white":"bg-gray-700 hover:bg-gray-600"}`}
+                      onClick={() => applyTransformation(effect)}
+                      disabled={processing}
+                    >
+                      <Wand size={18} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <div className="mt-6 flex justify-end gap-3">
         {isChanged && (
           <button
@@ -508,8 +664,11 @@ const Page = () => {
             Save Draft
           </button>
         )}
-        <button type="button" className="px-4 py-2 bg-blue-700 text-white rounded-md"
+        <button
+          type="submit"
+          className="px-4 py-2 bg-blue-700 text-white rounded-md"
           disabled={loading}
+
         >
           {loading ? "Creating..." : "Create"}
         </button>

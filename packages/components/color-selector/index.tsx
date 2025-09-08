@@ -25,7 +25,7 @@ const ColorSelector = ({ control, errors }: any) => {
         name="colors"
         control={control}
         render={({ field }) => (
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-2 flex-wrap">
             {[...defaultColors, ...customColors].map((color) => {
               const isSelected = (field.value || []).includes(color);
               const isLightColor = ["#ffffff", "#ffff00"].includes(color);
@@ -40,8 +40,8 @@ const ColorSelector = ({ control, errors }: any) => {
                         : [...(field.value || []), color]
                     )
                   }
-                  className={`w-7 h-7 p-2 rounded-md my-1 flex items-center justify-center border-2 transition ${
-                    isSelected ? "scale-110 border-white" : "border-transparent"
+                  className={`w-7 h-7 p-3 rounded-md my-1 flex items-center justify-center border-2 transition ${
+                    isSelected ? "scale-110 border border-white" : "border-transparent"
                   } ${isLightColor ? "border-gray-600" : ""}`}
                   style={{ backgroundColor: color }}
                 />
@@ -51,7 +51,7 @@ const ColorSelector = ({ control, errors }: any) => {
             {/* Add new color */}
             <button
               type="button"
-              className="w-8 h-8 flex items-center justify-center rounded-full border-2 border-gray-500 bg-gray-800 hover:bg-gray-700 transition"
+              className="w-8 h-8 p-2 flex items-center justify-center rounded-full border-2 border-gray-500 bg-gray-800 hover:bg-gray-700 transition"
               onClick={() => setShowColorPicker(!showColorPicker)}
             >
               <Plus size={16} color="white" />

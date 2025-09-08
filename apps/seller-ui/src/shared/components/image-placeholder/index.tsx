@@ -6,18 +6,24 @@ const ImagePLaceHolder = ({
   size,
   small,
   onImageChange,
+  setSelectedImage,
   onRemove,
   defaultImage = null,
   index = null,
   setOpenImageModal,
+  pictureUploadingLoader,
+  images,
 }: {
   size: string;
   small?: boolean;
   onImageChange: (file: File | null, index: number) => void;
   onRemove?: (index: number) => void;
   defaultImage?: string | null;
+  setSelectedImage: (e: string) => void;
   setOpenImageModal: (openImageModal: boolean) => void;
+  pictureUploadingLoader?: boolean;
   index?: any;
+  images: any;
 }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(defaultImage);
 
@@ -46,6 +52,7 @@ const ImagePLaceHolder = ({
         <>
           <button
             type="button"
+            disabled={pictureUploadingLoader}
             onClick={() => onRemove?.(index!)}
             className="absolute top-3 right-3 p-2 !rounded bg-red-600 shadow-lg"
           >
@@ -53,7 +60,11 @@ const ImagePLaceHolder = ({
           </button>
           <button
             className="absolute top-3 right-[70px] p-2 !rounded bg-blue-500 shadow-lg cursor-pointer"
-            onClick={() => setOpenImageModal(true)}
+            disabled={pictureUploadingLoader}
+            onClick={() => {
+              setOpenImageModal(true);
+              setSelectedImage(images[index].file_url);
+            }}
           >
             <WandSparkles size={16} />
           </button>
@@ -84,7 +95,11 @@ const ImagePLaceHolder = ({
           >
             {size}
           </p>
-          <p className={`text-gray-500 ${small ? "text-sm" : "text-lg"} pt-2 text-center`}>
+          <p
+            className={`text-gray-500 ${
+              small ? "text-sm" : "text-lg"
+            } pt-2 text-center`}
+          >
             Please choose an image <br />
             according to the expected ratio
           </p>

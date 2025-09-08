@@ -1,11 +1,12 @@
 import express from "express";
+import "./jobs/product-crone.job";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-//import swaggerUi from "swagger-ui-express";
 import { errorMiddleware } from "@packages/error-handler/error-middleware";
 import router from "./routes/product.router";
 
-//const swaggerDocument = require("./swagger-output.json");
+import swaggerUi from "swagger-ui-express";
+const swaggerDocument = require("./swagger-output.json");
 
 const app = express();
 
@@ -24,10 +25,10 @@ app.get("/", (req, res) => {
   res.send({ message: "Hello Product API" });
 });
 
-//app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-//app.get("/docs-json", (req, res) => {
-//  res.json(swaggerDocument);
-//});
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.get("/docs-json", (req, res) => {
+  res.json(swaggerDocument);
+});
 
 //Routes
 app.use("/api", router);

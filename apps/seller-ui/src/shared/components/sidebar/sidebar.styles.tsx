@@ -14,8 +14,8 @@ export const SidebarWrapper=styled.div`
   overflow-y: auto;
   border-right: 1px solid var(--border);
   flex-direction: column;
-  padding-top: var(--space-10);
-  padding-bottom: var(--space-10);
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-8);
   padding-left: var(--space-6);
   padding-right: var(--space-6);
 
