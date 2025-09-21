@@ -1,9 +1,13 @@
 "use client";
+import {useQuery} from "@tanstack/react-query";
 import {navItem} from "apps/user-ui/src/configs/constants";
 import useUser from "apps/user-ui/src/hooks/useUser";
+import {useStore} from "apps/user-ui/src/store";
+import axiosInstance from "apps/user-ui/src/utils/axiosInstance";
 import {
   AlignLeft,
   ChevronDown,
+  ChevronRight,
   Heart,
   ShoppingCart,
   UserRound,
@@ -13,8 +17,19 @@ import React, { useEffect, useState } from "react";
 
 const HeaderBottom = () => {
   const [show, setShow] = useState(false);
-  const [isSticky, setIsSticky] = useState(false);
+  const [isSticky, setIsSticky]=useState(false);
+  const [expandedCategory, setExpandedCategory]=useState<string|null>(null)
+  const wishlist=useStore((state: any) => state.wishlist);
+  const cart=useStore((state: any) => state.cart);
   const { user, isLoading } = useUser();
+  const {data}=useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const res=await axiosInstance.get("/product/api/get-categories")
+      return res.data;
+    },
+    staleTime: 1000 * 60 * 30,
+  })
 
   // Track scroll position
   useEffect(() => {
@@ -63,8 +78,62 @@ const HeaderBottom = () => {
           <div
             className={`absolute left-0 ${
               isSticky ? "top-[70px]" : "top-[50px]"
-            } w-[260px] h-[400px] bg-[#f5f5f5]`}
-          ></div>
+            } w-[260px] h-[400px] overflow-y-auto bg-white shadow-md`}
+          >
+            {data?.categories?.length>0? (
+              data?.categories.map((cat: string, i: number) => {
+                const hasSub=data.subCategories?.[cat]?.length>0;
+                const isExpanded=expandedCategory===cat;
+
+                return (
+                  <div key={i} className="relative">
+                    <button
+                      onClick={() => {
+                        if(hasSub) {
+                          setExpandedCategory((prev) =>
+                            prev===cat? null:cat
+                          );
+                        } else {
+                          setShow(false);
+                          window.location.href = `/products?category=${encodeURIComponent(cat)}`
+                        }
+                      }}
+                      className="w-full flex items-center justify-between"
+                    >
+                      <span>{cat}</span>
+                      {hasSub&&
+                        (isExpanded? (
+                          <ChevronDown className="w-4 h-4 text-gray-500"  />
+                        ):(
+                          <ChevronRight className="w-4 h-4 text-gray-500" />
+                        ))}
+                    </button>
+
+                    {/* Subcategories Panel */}
+                    {isExpanded&&hasSub&&(
+                      <div className="pl-4 bg-gray-50 border-t border-[1px]">
+                        {data.subCategories[cat].map(
+                          (sub: string, j: number) => (
+                            <Link
+                              key={j}
+                              href={`/products?category=${encodeURIComponent(cat)}`}
+                              className="block px-4 py-2 text-sm text-gray-500"
+                            >
+                              {sub}
+                            </Link>
+                          )
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            ): (
+                <p className="px-5 py-4 text-sm text-gray-500">
+                  No categories found
+                </p>
+            )}
+          </div>
         )}
 
         {/* Navigation links */}
@@ -120,13 +189,13 @@ const HeaderBottom = () => {
                 <Link href={"/wishlist"} className="relative">
                   <Heart />
                   <div className="w-6 h-6 border-2 border-white bg-red-500 rounded-full flex items-center justify-center absolute top-[-10px] right-[-10px]">
-                    <span className="text-white font-medium text-sm">0</span>
+                    <span className="text-white font-medium text-sm">{wishlist?.length}</span>
                   </div>
                 </Link>
                 <Link href={"/cart"} className="relative">
                   <ShoppingCart />
                   <div className="w-6 h-6 border-2 border-white bg-red-500 rounded-full flex items-center justify-center absolute top-[-10px] right-[-10px]">
-                    <span className="text-white font-medium text-sm">0</span>
+                    <span className="text-white font-medium text-sm">{cart?.length}</span>
                   </div>
                 </Link>
               </div>

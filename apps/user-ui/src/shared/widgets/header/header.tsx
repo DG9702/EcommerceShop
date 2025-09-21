@@ -1,13 +1,35 @@
 "use client";
 import Link from "next/link";
-import React from "react";
+import React, {useState} from "react";
 import { Heart, Search, ShoppingCart, UserRound } from "lucide-react";
 import HeaderBottom from "./header-bottom";
 import useUser from "apps/user-ui/src/hooks/useUser";
+import axiosInstance from "apps/user-ui/src/utils/axiosInstance";
+import {useStore} from "apps/user-ui/src/store";
 
 const Header=() => {
-  const { user, isLoading } = useUser();
+  const {user, isLoading}=useUser();
+  const wishlist=useStore((state: any) => state.wishlist);
+  const cart=useStore((state: any) => state.cart);
 
+  const [searchQuery, setSearchQuery]=useState("");
+  const [suggestions, setSuggestions]=useState<any[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions]=useState(false);
+
+  const handleSearchClick = async () => {
+    if (!searchQuery.trim()) return;
+    setLoadingSuggestions(true);
+    try {
+      const res = await axiosInstance.get(
+        `/product/api/search-products?q=${encodeURIComponent(searchQuery)}`
+      );
+      setSuggestions(res.data || []);
+    } catch (error) {
+      console.error("Search error:", error);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
 
   return (
     <div className="w-full bg-white">
@@ -17,16 +39,37 @@ const Header=() => {
             <span className="text-3xl font-[500]">Eshop</span>
           </Link>
         </div>
-
+        {/* Search */}
         <div className="w-[50%] relative">
           <input
             type="text"
             placeholder="Search for products..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearchClick()}
             className="w-full px-4 font-Poppins font-medium border-[2.5px] rounded-lg border-[#3489ff] outline-none h-[55px]"
           />
-          <div className="w-[60px] cursor-pointer flex items-center justify-center h-[55px] bg-[#3489ff] absolute top-0 right-0">
+          <button onClick={handleSearchClick} className="w-[60px] cursor-pointer flex items-center justify-center h-[55px] bg-[#3489ff] absolute top-0 right-0">
             <Search color="#fff" className="rounded-lg" />
-          </div>
+          </button>
+          {/* Suggestions */}
+          {searchQuery && suggestions.length > 0 && (
+            <div className="absolute top-[60px] w-full bg-white border rounded-lg shadow-md max-h-[300px] overflow-y-auto z-50">
+              {loadingSuggestions ? (
+                <div className="p-3 text-gray-500">Loading...</div>
+              ) : (
+                suggestions.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/product/${item.slug}`}
+                    className="block px-4 py-2 hover:bg-gray-100"
+                  >
+                    {item.title}
+                  </Link>
+                ))
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-2">
@@ -64,13 +107,13 @@ const Header=() => {
             <Link href={"/wishlist"} className="relative">
               <Heart />
               <div className="w-6 h-6 border-2 border-white bg-red-500 rounded-full flex items-center justify-center absolute top-[-10px] right-[-10px]">
-                <span className="text-white font-medium text-sm">0</span>
+                <span className="text-white font-medium text-sm">{wishlist?.length}</span>
               </div>
             </Link>
             <Link href={"/cart"} className="relative">
               <ShoppingCart />
               <div className="w-6 h-6 border-2 border-white bg-red-500 rounded-full flex items-center justify-center absolute top-[-10px] right-[-10px]">
-                <span className="text-white font-medium text-sm">0</span>
+                <span className="text-white font-medium text-sm">{cart?.length}</span>
               </div>
             </Link>
           </div>
